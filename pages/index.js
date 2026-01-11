@@ -5,12 +5,12 @@ import { Compass, MapPin, Calendar as CalIcon, Clock, X } from 'lucide-react';
 export default function ZenMuslim() {
   const [data, setData] = useState({ times: null, qibla: 0, city: "Jeddah" });
   const [dates, setDates] = useState({ greg: "", hijri: "" });
-  const [view, setView] = useState('prayers'); // 'prayers' or 'calendar'
+  const [view, setView] = useState('prayers');
 
   useEffect(() => {
     const now = new Date();
     
-    // Umm al-Qura Calendar Formatting
+    // Umm al-Qura Calendar Logic
     const hijriFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
@@ -27,11 +27,11 @@ export default function ZenMuslim() {
         const params = CalculationMethod.MuslimWorldLeague();
         const pTimes = new PrayerTimes(coords, now, params);
         
-        setData({ 
+        setData(prev => ({ 
+          ...prev,
           times: pTimes, 
-          qibla: Qibla(coords), 
-          city: "Detecting City..." 
-        });
+          qibla: Qibla(coords)
+        }));
 
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
@@ -55,28 +55,26 @@ export default function ZenMuslim() {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#001f3f] text-white pb-24 relative font-sans">
-      {/* Background Decor */}
       <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/mosque-ad-din.png')]"></div>
 
-      {/* Main Prayer View */}
-      {view === 'prayers' && (
+      {view === 'prayers' ? (
         <>
           <header className="p-8 text-center relative">
             <div className="flex justify-center items-center gap-2 text-emerald-400 mb-1">
               <MapPin size={16} />
               <span className="text-xs font-bold uppercase tracking-widest">{data.city}</span>
             </div>
-            <h1 className="text-4xl font-bold mb-4">{dates.hijri}</h1>
+            <h1 className="text-3xl font-bold mb-2">{dates.hijri}</h1>
             <p className="opacity-60 text-sm italic">{dates.greg}</p>
           </header>
 
           <div className="px-6 py-4">
             <div className="bg-emerald-500 p-4 rounded-2xl flex justify-between items-center mb-8 shadow-lg shadow-emerald-500/20">
               <div>
-                <p className="text-xs font-bold text-emerald-900 uppercase">Qibla Direction</p>
+                <p className="text-xs font-bold text-emerald-900 uppercase tracking-tighter">Qibla Direction</p>
                 <p className="text-2xl font-black text-[#001f3f]">{Math.round(data.qibla)}° North</p>
               </div>
-              <Compass size={32} className="text-[#001f3f]" />
+              <Compass size={32} className="text-[#001f3f] animate-pulse" />
             </div>
 
             <div className="space-y-1">
@@ -87,14 +85,12 @@ export default function ZenMuslim() {
               <PrayerRow name="Maghrib" time={data.times?.maghrib} />
               <PrayerRow name="Isha" time={data.times?.isha} />
             </div>
-          </>
-        )}
-
-      {/* Umm Al-Qura Calendar View */}
-      {view === 'calendar' && (
-        <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          </div>
+        </>
+      ) : (
+        <div className="p-8">
           <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-bold">Islamic Calendar</h2>
+            <h2 className="text-2xl font-bold">Umm Al-Qura</h2>
             <button onClick={() => setView('prayers')} className="p-2 bg-white/10 rounded-full">
               <X size={20} />
             </button>
@@ -106,7 +102,7 @@ export default function ZenMuslim() {
             </div>
             <div>
               <p className="text-emerald-400 font-bold text-3xl mb-2">{dates.hijri}</p>
-              <p className="text-xs uppercase tracking-[0.2em] opacity-50">Umm Al-Qura Standard</p>
+              <p className="text-xs uppercase tracking-[0.2em] opacity-50 font-bold">Saudi Islamic Standard</p>
             </div>
             <div className="h-px bg-white/10 w-full" />
             <div>
@@ -114,15 +110,11 @@ export default function ZenMuslim() {
               <p className="text-xs uppercase tracking-[0.2em] opacity-50">Gregorian Date</p>
             </div>
           </div>
-          
-          <p className="mt-8 text-center text-sm opacity-40 leading-relaxed px-4">
-            This date is calculated using the official Umm al-Qura sighting standards of Saudi Arabia.
-          </p>
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[350px] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-4 flex justify-around items-center shadow-2xl">
+      {/* Navigation Bar */}
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-[350px] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-4 flex justify-around items-center shadow-2xl z-50">
         <button onClick={() => setView('prayers')} className={view === 'prayers' ? "text-emerald-400" : "text-white/40"}>
           <Clock size={24} />
         </button>
@@ -130,9 +122,9 @@ export default function ZenMuslim() {
           <CalIcon size={24} />
         </button>
         <div className="h-6 w-px bg-white/10" />
-        <div className="flex flex-col items-center">
-          <Compass size={24} className="text-white/20" />
-        </div>
+        <a href="https://qiblafinder.withgoogle.com/" target="_blank" rel="noreferrer">
+          <Compass size={24} className="text-white/40 hover:text-emerald-400" />
+        </a>
       </nav>
     </div>
   );
