@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Coordinates, CalculationMethod, PrayerTimes, Qibla } from 'adhan';
-import { Compass, MapPin, Calendar as CalIcon, Clock, X } from 'lucide-react';
+import { Compass, MapPin, Calendar as CalIcon, Clock, Calculator, ArrowLeftRight } from 'lucide-react';
 
 export default function ZenMuslim() {
   const [data, setData] = useState({ times: null, qibla: 0, city: "Jeddah" });
   const [dates, setDates] = useState({ greg: "", hijri: "" });
-  const [view, setView] = useState('prayers');
+  const [view, setView] = useState('prayers'); 
+  
+  // Zakat State
+  const [wealth, setWealth] = useState("");
+  // Converter State
+  const [convDate, setConvDate] = useState("");
+  const [convertedResult, setConvertedResult] = useState("");
 
   useEffect(() => {
     const now = new Date();
-    
-    // Umm al-Qura Calendar Logic
-    const hijriFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', {
+    const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
-    
     setDates({
       greg: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
       hijri: hijriFormatter.format(now)
@@ -26,23 +29,26 @@ export default function ZenMuslim() {
         const coords = new Coordinates(lat, lon);
         const params = CalculationMethod.MuslimWorldLeague();
         const pTimes = new PrayerTimes(coords, now, params);
-        
-        setData(prev => ({ 
-          ...prev,
-          times: pTimes, 
-          qibla: Qibla(coords)
-        }));
-
+        setData(prev => ({ ...prev, times: pTimes, qibla: Qibla(coords) }));
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
           const geoData = await res.json();
           setData(prev => ({ ...prev, city: geoData.address.city || geoData.address.town || "My Location" }));
-        } catch (e) {
-          setData(prev => ({ ...prev, city: "Jeddah" }));
-        }
+        } catch (e) { console.error("City fetch failed"); }
       });
     }
   }, []);
+
+  const handleConvert = (type) => {
+    if (!convDate) return;
+    const d = new Date(convDate);
+    if (type === 'toHijri') {
+      const h = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      }).format(d);
+      setConvertedResult(h);
+    }
+  };
 
   const PrayerRow = ({ name, time }) => (
     <div className="flex justify-between items-center p-5 mx-4 mb-2 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10">
@@ -54,77 +60,94 @@ export default function ZenMuslim() {
   );
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-[#001f3f] text-white pb-24 relative font-sans">
-      <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/mosque-ad-din.png')]"></div>
-
-      {view === 'prayers' ? (
+    <div className="max-w-md mx-auto min-h-screen bg-[#001f3f] text-white pb-28 relative font-sans overflow-x-hidden">
+      
+      {/* 1. PRAYERS VIEW */}
+      {view === 'prayers' && (
         <>
-          <header className="p-8 text-center relative">
-            <div className="flex justify-center items-center gap-2 text-emerald-400 mb-1">
+          <header className="p-8 text-center">
+            <div className="flex justify-center items-center gap-2 text-emerald-400 mb-2">
               <MapPin size={16} />
               <span className="text-xs font-bold uppercase tracking-widest">{data.city}</span>
             </div>
-            <h1 className="text-3xl font-bold mb-2">{dates.hijri}</h1>
-            <p className="opacity-60 text-sm italic">{dates.greg}</p>
+            <h1 className="text-3xl font-bold mb-1">{dates.hijri}</h1>
+            <p className="opacity-50 text-xs uppercase tracking-widest">{dates.greg}</p>
           </header>
-
-          <div className="px-6 py-4">
-            <div className="bg-emerald-500 p-4 rounded-2xl flex justify-between items-center mb-8 shadow-lg shadow-emerald-500/20">
-              <div>
-                <p className="text-xs font-bold text-emerald-900 uppercase tracking-tighter">Qibla Direction</p>
-                <p className="text-2xl font-black text-[#001f3f]">{Math.round(data.qibla)}° North</p>
-              </div>
-              <Compass size={32} className="text-[#001f3f] animate-pulse" />
-            </div>
-
-            <div className="space-y-1">
-              <PrayerRow name="Fajr" time={data.times?.fajr} />
-              <PrayerRow name="Sunrise" time={data.times?.sunrise} />
-              <PrayerRow name="Dhuhr" time={data.times?.dhuhr} />
-              <PrayerRow name="Asr" time={data.times?.asr} />
-              <PrayerRow name="Maghrib" time={data.times?.maghrib} />
-              <PrayerRow name="Isha" time={data.times?.isha} />
-            </div>
+          <div className="space-y-1">
+            {["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"].map(p => (
+              <PrayerRow key={p} name={p} time={data.times?.[p.toLowerCase()]} />
+            ))}
           </div>
         </>
-      ) : (
-        <div className="p-8">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-bold">Umm Al-Qura</h2>
-            <button onClick={() => setView('prayers')} className="p-2 bg-white/10 rounded-full">
-              <X size={20} />
-            </button>
-          </div>
-          
-          <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 text-center space-y-6">
-            <div className="inline-block p-4 bg-emerald-500/20 rounded-full mb-2">
-              <CalIcon className="text-emerald-400" size={40} />
+      )}
+
+      {/* 2. ZAKAT & CONVERTER VIEW */}
+      {view === 'tools' && (
+        <div className="p-6 space-y-8 animate-in fade-in duration-300">
+          <section>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Calculator className="text-emerald-400"/> Zakat Calculator</h2>
+            <div className="bg-white/5 p-5 rounded-3xl border border-white/10">
+              <label className="text-xs opacity-50 uppercase mb-2 block">Total Wealth (Cash/Gold/Silver)</label>
+              <input 
+                type="number" 
+                value={wealth} 
+                onChange={(e) => setWealth(e.target.value)}
+                placeholder="Enter amount"
+                className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white outline-none focus:border-emerald-500 mb-4"
+              />
+              <div className="flex justify-between items-center bg-emerald-500/20 p-4 rounded-xl">
+                <span className="text-sm font-bold">Your Zakat (2.5%):</span>
+                <span className="text-xl font-black text-emerald-400">{(wealth * 0.025).toFixed(2)}</span>
+              </div>
             </div>
-            <div>
-              <p className="text-emerald-400 font-bold text-3xl mb-2">{dates.hijri}</p>
-              <p className="text-xs uppercase tracking-[0.2em] opacity-50 font-bold">Saudi Islamic Standard</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><ArrowLeftRight className="text-emerald-400"/> Date Converter</h2>
+            <div className="bg-white/5 p-5 rounded-3xl border border-white/10">
+              <input 
+                type="date" 
+                onChange={(e) => setConvDate(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white mb-4"
+              />
+              <button 
+                onClick={() => handleConvert('toHijri')}
+                className="w-full bg-emerald-500 text-[#001f3f] font-bold p-3 rounded-xl mb-4"
+              >
+                Convert to Hijri
+              </button>
+              {convertedResult && (
+                <div className="text-center p-3 bg-white/5 rounded-xl border border-emerald-500/30">
+                  <p className="text-emerald-400 font-bold">{convertedResult}</p>
+                </div>
+              )}
             </div>
-            <div className="h-px bg-white/10 w-full" />
-            <div>
-              <p className="text-xl font-medium">{dates.greg}</p>
-              <p className="text-xs uppercase tracking-[0.2em] opacity-50">Gregorian Date</p>
-            </div>
-          </div>
+          </section>
         </div>
       )}
 
-      {/* Navigation Bar */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-[350px] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-4 flex justify-around items-center shadow-2xl z-50">
-        <button onClick={() => setView('prayers')} className={view === 'prayers' ? "text-emerald-400" : "text-white/40"}>
-          <Clock size={24} />
-        </button>
-        <button onClick={() => setView('calendar')} className={view === 'calendar' ? "text-emerald-400" : "text-white/40"}>
-          <CalIcon size={24} />
-        </button>
-        <div className="h-6 w-px bg-white/10" />
-        <a href="https://qiblafinder.withgoogle.com/" target="_blank" rel="noreferrer">
-          <Compass size={24} className="text-white/40 hover:text-emerald-400" />
-        </a>
+      {/* 3. QIBLA VIEW */}
+      {view === 'qibla' && (
+        <div className="p-8 text-center animate-in zoom-in-95 duration-300">
+          <h2 className="text-2xl font-bold mb-8 uppercase tracking-widest">Qibla</h2>
+          <div className="relative w-64 h-64 mx-auto mb-10">
+            <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+            <div className="absolute inset-0 flex items-center justify-center transition-transform duration-500" style={{ transform: `rotate(${data.qibla}deg)` }}>
+              <div className="w-1 h-32 bg-emerald-500 relative"><div className="absolute -top-4 -left-1.5 border-l-8 border-r-8 border-b-16 border-b-emerald-500 border-x-transparent"></div></div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Compass size={40} className="text-emerald-400" />
+            </div>
+          </div>
+          <p className="text-3xl font-black text-emerald-400">{Math.round(data.qibla)}°</p>
+        </div>
+      )}
+
+      {/* NAVIGATION BAR */}
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[380px] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-3 flex justify-around items-center shadow-2xl z-50">
+        <button onClick={() => setView('prayers')} className={view === 'prayers' ? "text-emerald-400 p-2" : "text-white/40 p-2"}><Clock size={24} /></button>
+        <button onClick={() => setView('tools')} className={view === 'tools' ? "text-emerald-400 p-2" : "text-white/40 p-2"}><Calculator size={24} /></button>
+        <button onClick={() => setView('qibla')} className={view === 'qibla' ? "text-emerald-400 p-2" : "text-white/40 p-2"}><Compass size={24} /></button>
       </nav>
     </div>
   );
