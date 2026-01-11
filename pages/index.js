@@ -15,12 +15,23 @@ export default function ZenMuslim() {
 
   useEffect(() => {
     const now = new Date();
+    
+    // FIX: Arabic Hijri Formatter (Umm al-Qura) - Day / Month / Year
     const hijriFormatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
-      day: 'numeric', month: 'long', year: 'numeric'
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
     });
+    
+    // Format the date parts to ensure Day / Month / Year order
+    const parts = hijriFormatter.formatToParts(now);
+    const hDay = parts.find(p => p.type === 'day').value;
+    const hMonth = parts.find(p => p.type === 'month').value;
+    const hYear = parts.find(p => p.type === 'year').value;
+
     setDates({
-      greg: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-      hijri: hijriFormatter.format(now)
+      greg: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+      hijri: `${hDay} / ${hMonth} / ${hYear}` // Fixed Format
     });
 
     if (navigator.geolocation) {
@@ -42,12 +53,11 @@ export default function ZenMuslim() {
   const handleConvert = (type) => {
     if (!convDate) return;
     const d = new Date(convDate);
-    if (type === 'toHijri') {
-      const h = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn', {
-        day: 'numeric', month: 'long', year: 'numeric'
-      }).format(d);
-      setConvertedResult(h);
-    }
+    // Fixed conversion logic to Hijri month names
+    const h = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    }).format(d);
+    setConvertedResult(h);
   };
 
   const PrayerRow = ({ name, time }) => (
@@ -62,16 +72,21 @@ export default function ZenMuslim() {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#001f3f] text-white pb-28 relative font-sans overflow-x-hidden">
       
+      {/* HEADER: Salah Time */}
+      <div className="pt-8 px-8 text-center">
+         <h1 className="text-emerald-500 font-black text-xl uppercase tracking-[0.3em]">Salah Time</h1>
+      </div>
+
       {/* 1. PRAYERS VIEW */}
       {view === 'prayers' && (
         <>
-          <header className="p-8 text-center">
+          <header className="p-6 text-center">
             <div className="flex justify-center items-center gap-2 text-emerald-400 mb-2">
-              <MapPin size={16} />
-              <span className="text-xs font-bold uppercase tracking-widest">{data.city}</span>
+              <MapPin size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">{data.city}</span>
             </div>
-            <h1 className="text-3xl font-bold mb-1">{dates.hijri}</h1>
-            <p className="opacity-50 text-xs uppercase tracking-widest">{dates.greg}</p>
+            <h2 className="text-2xl font-bold mb-1 tracking-tight">{dates.hijri}</h2>
+            <p className="opacity-40 text-[10px] uppercase tracking-[0.2em]">{dates.greg}</p>
           </header>
           <div className="space-y-1">
             {["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"].map(p => (
@@ -87,7 +102,7 @@ export default function ZenMuslim() {
           <section>
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Calculator className="text-emerald-400"/> Zakat Calculator</h2>
             <div className="bg-white/5 p-5 rounded-3xl border border-white/10">
-              <label className="text-xs opacity-50 uppercase mb-2 block">Total Wealth (Cash/Gold/Silver)</label>
+              <label className="text-xs opacity-50 uppercase mb-2 block font-bold">Total Wealth</label>
               <input 
                 type="number" 
                 value={wealth} 
@@ -96,7 +111,7 @@ export default function ZenMuslim() {
                 className="w-full bg-white/10 border border-white/20 rounded-xl p-3 text-white outline-none focus:border-emerald-500 mb-4"
               />
               <div className="flex justify-between items-center bg-emerald-500/20 p-4 rounded-xl">
-                <span className="text-sm font-bold">Your Zakat (2.5%):</span>
+                <span className="text-sm font-bold">Amount (2.5%):</span>
                 <span className="text-xl font-black text-emerald-400">{(wealth * 0.025).toFixed(2)}</span>
               </div>
             </div>
@@ -112,13 +127,13 @@ export default function ZenMuslim() {
               />
               <button 
                 onClick={() => handleConvert('toHijri')}
-                className="w-full bg-emerald-500 text-[#001f3f] font-bold p-3 rounded-xl mb-4"
+                className="w-full bg-emerald-500 text-[#001f3f] font-bold p-3 rounded-xl mb-4 uppercase text-xs tracking-widest"
               >
-                Convert to Hijri
+                Get Hijri Date
               </button>
               {convertedResult && (
-                <div className="text-center p-3 bg-white/5 rounded-xl border border-emerald-500/30">
-                  <p className="text-emerald-400 font-bold">{convertedResult}</p>
+                <div className="text-center p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
+                  <p className="text-emerald-400 font-black text-lg">{convertedResult}</p>
                 </div>
               )}
             </div>
@@ -145,9 +160,9 @@ export default function ZenMuslim() {
 
       {/* NAVIGATION BAR */}
       <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[380px] bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-3 flex justify-around items-center shadow-2xl z-50">
-        <button onClick={() => setView('prayers')} className={view === 'prayers' ? "text-emerald-400 p-2" : "text-white/40 p-2"}><Clock size={24} /></button>
-        <button onClick={() => setView('tools')} className={view === 'tools' ? "text-emerald-400 p-2" : "text-white/40 p-2"}><Calculator size={24} /></button>
-        <button onClick={() => setView('qibla')} className={view === 'qibla' ? "text-emerald-400 p-2" : "text-white/40 p-2"}><Compass size={24} /></button>
+        <button onClick={() => setView('prayers')} className={view === 'prayers' ? "text-emerald-400 p-2 bg-white/5 rounded-full" : "text-white/40 p-2"}><Clock size={24} /></button>
+        <button onClick={() => setView('tools')} className={view === 'tools' ? "text-emerald-400 p-2 bg-white/5 rounded-full" : "text-white/40 p-2"}><Calculator size={24} /></button>
+        <button onClick={() => setView('qibla')} className={view === 'qibla' ? "text-emerald-400 p-2 bg-white/5 rounded-full" : "text-white/40 p-2"}><Compass size={24} /></button>
       </nav>
     </div>
   );
