@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { Coordinates, CalculationMethod, PrayerTimes, Qibla } from 'adhan';
-import { Compass, MapPin, Clock, Calculator, Calendar as CalendarIcon, Download, Smartphone, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { Compass, MapPin, Clock, Calculator, Calendar as CalendarIcon, Smartphone, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 
 export default function SalahApp() {
   const [data, setData] = useState({ times: null, qibla: 0, city: "Jeddah", next: "" });
@@ -13,30 +13,28 @@ export default function SalahApp() {
   const [convDate, setConvDate] = useState("");
   const [convertedResult, setConvertedResult] = useState("");
   const [hasPermission, setHasPermission] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState(null);
   const [calDate, setCalDate] = useState(new Date());
 
-  // 1. One-Click Install Logic
+  // 1. Silent PWA Registration
   useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    // This listener stays silent. The browser will use it to show its own popup.
+    window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('Install prompt ready');
+    });
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const coords = new Coordinates(pos.coords.latitude, pos.coords.longitude);
+        const p = new PrayerTimes(coords, new Date(), CalculationMethod.UmmAlQura());
+        setData({ times: p, qibla: Qibla(coords), city: "Jeddah", next: p.nextPrayer() });
+      });
+    }
   }, []);
 
-  const handleInstall = async () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') setInstallPrompt(null);
-    } else {
-      alert("To Install: \n1. Open Safari/Chrome\n2. Tap 'Share' or 'Menu'\n3. Select 'Add to Home Screen'");
-    }
-  };
-
-  // 2. Compass Sensor
   const startCompass = async () => {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
       const res = await DeviceOrientationEvent.requestPermission();
@@ -50,24 +48,9 @@ export default function SalahApp() {
     }
   };
 
-  // 3. Hijri Date Helper (Forced to show Rajab, etc.)
   const getHijri = (date) => {
-    const f = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {day:'numeric', month:'long', year:'numeric'});
-    return f.formatToParts(date).reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+    return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {day:'numeric', month:'long', year:'numeric'}).formatToParts(date).reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
   };
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const coords = new Coordinates(pos.coords.latitude, pos.coords.longitude);
-        const p = new PrayerTimes(coords, new Date(), CalculationMethod.UmmAlQura());
-        setData({ times: p, qibla: Qibla(coords), city: "Jeddah", next: p.nextPrayer() });
-      });
-    }
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-  }, []);
 
   const renderCalendarDays = () => {
     const days = [];
@@ -94,14 +77,10 @@ export default function SalahApp() {
         <title>Salah Time</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#001f3f" />
       </Head>
 
-      {/* INSTALL BAR */}
-      <div className="bg-emerald-500 p-4 sticky top-0 z-[100] cursor-pointer" onClick={handleInstall}>
-        <span className="text-[#001f3f] font-black text-xs flex justify-center items-center gap-2 uppercase tracking-widest"><Download size={14}/> Install Salah App</span>
-      </div>
-
-      {/* PRAYERS VIEW */}
+      {/* VIEW: PRAYERS */}
       {view === 'prayers' && (
         <div className="p-6 pt-10">
           <div className="text-center mb-10">
@@ -112,7 +91,7 @@ export default function SalahApp() {
             <p className="opacity-40 text-xs font-bold uppercase tracking-widest mt-2">{new Date().toDateString()}</p>
           </div>
           {["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"].map(p => (
-            <div key={p} className={`flex justify-between p-5 mb-2 rounded-2xl border ${data.next === p.toLowerCase() ? 'bg-emerald-500 border-emerald-400 text-[#001f3f] shadow-xl' : 'bg-white/5 border-white/10'}`}>
+            <div key={p} className={`flex justify-between p-5 mb-2 rounded-2xl border ${data.next === p.toLowerCase() ? 'bg-emerald-500 border-emerald-400 text-[#001f3f]' : 'bg-white/5 border-white/10'}`}>
               <span className="font-black uppercase text-xs tracking-widest">{p}</span>
               <span className="font-mono font-bold text-lg">{data.times?.[p.toLowerCase()]?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "--:--"}</span>
             </div>
@@ -120,9 +99,9 @@ export default function SalahApp() {
         </div>
       )}
 
-      {/* CALENDAR VIEW */}
+      {/* VIEW: CALENDAR */}
       {view === 'calendar' && (
-        <div className="p-6 animate-in slide-in-from-bottom-4">
+        <div className="p-6">
           <h3 className="text-emerald-400 font-black uppercase tracking-widest text-xs mb-6 flex items-center gap-2"><CalendarIcon size={16}/> Monthly View</h3>
           <div className="bg-white/5 p-5 rounded-[2.5rem] border border-white/10">
             <div className="flex justify-between items-center mb-8">
@@ -138,7 +117,7 @@ export default function SalahApp() {
         </div>
       )}
 
-      {/* TOOLS VIEW */}
+      {/* VIEW: TOOLS */}
       {view === 'tools' && (
         <div className="p-6 space-y-8">
           <section>
@@ -162,7 +141,7 @@ export default function SalahApp() {
         </div>
       )}
 
-      {/* QIBLA VIEW */}
+      {/* VIEW: QIBLA */}
       {view === 'qibla' && (
         <div className="p-10 text-center">
           {!hasPermission ? (
@@ -194,8 +173,8 @@ export default function SalahApp() {
         </div>
       )}
 
-      {/* NAVIGATION */}
-      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] bg-white/10 backdrop-blur-3xl border border-white/20 rounded-full p-2 flex justify-between items-center z-50">
+      {/* NAV BAR */}
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] bg-white/10 backdrop-blur-3xl border border-white/20 rounded-full p-2 flex justify-between items-center z-50 shadow-2xl">
         <button onClick={()=>setView('prayers')} className={`p-4 rounded-full ${view ==='prayers' ? 'bg-emerald-500 text-[#001f3f]' : 'text-white/30'}`}><Clock size={24}/></button>
         <button onClick={()=>setView('calendar')} className={`p-4 rounded-full ${view ==='calendar' ? 'bg-emerald-500 text-[#001f3f]' : 'text-white/30'}`}><CalendarIcon size={24}/></button>
         <button onClick={()=>setView('tools')} className={`p-4 rounded-full ${view ==='tools' ? 'bg-emerald-500 text-[#001f3f]' : 'text-white/30'}`}><Calculator size={24}/></button>
